@@ -5,7 +5,8 @@ class CTScanModule:
         self._name = name
         self._id = id
         self._ct_scan_array = scan_array
-        self._nodule_location = nodule_location #(x, y ,z)
+        self._nodule_location = [nodule_location] #List with touples of locations (x, y ,z)
+        self._nodule_count = len(self._nodule_location)
 
 
     @property
@@ -21,3 +22,13 @@ class CTScanModule:
     @property
     def id(self):
         return self._id
+
+
+    @property
+    def nodule_count(self):
+        return self._nodule_count
+
+
+    def add_nodule_location(self, location):
+        self._nodule_count += 1
+        self._nodule_location.append(location)

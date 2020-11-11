@@ -42,18 +42,26 @@ class NeuralNetManager:
             print("[!] Path file not specified!")
             return
 
-        file = open(path_file, 'r')
+        file = open(path_file, 'r') #Reading the .csv file
         for line in file.readlines():
             line = line.split(';')
             
+            #Splitting the data into relevant groups
             name = line[1]
-            data = self.get_dicom_data(line[0])
+            data = None #Optimization so CT scan is not loaded if the patient already exists
             nodule_position = (int(line[2]), int(line[3]), int(line[4]))
 
-            CT_scan_object = CTScanModule(name, len(self._ct_scan_list), data, nodule_position)
-            self._ct_scan_list.append(CT_scan_object)
+            #Checking if the patient already exists
+            existing_scan = self.search_scan_by_name(name)
+            if (existing_scan is not None):
+                existing_scan.add_nodule_location(nodule_position)
+            else:
+                data = self.get_dicom_data(line[0]) #Late data loading
+                CT_scan_object = CTScanModule(name, len(self._ct_scan_list), data, nodule_position)
+                self._ct_scan_list.append(CT_scan_object)
 
 
+    #Loads DICOM data using MedPy
     def get_dicom_data(self, path_to_data):
         try:
             print("[*] Loading {}".format(path_to_data))
