@@ -1,12 +1,13 @@
 import os
 
 from NeuralNetManager import NeuralNetManager
+from Parser import Parser
 
 DATASET_FILE = 'D:\LungCancerCTScans\SPIE-AAPM Lung CT Challenge\paths.csv'
 
 def main():
     manager = NeuralNetManager()
-    manager.load_ct_scans(DATASET_FILE)
-
+    parser = Parser(manager)
+    
 
 main()
