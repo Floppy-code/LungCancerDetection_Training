@@ -7,6 +7,7 @@ import os
 
 #My imports
 from CTScanModule import CTScanModule
+import NeuralNet
 
 class NeuralNetManager:
     """Manager used to create and train new neural networks using CTScanModules"""
