@@ -1,7 +1,12 @@
-import NeuralNetManager
+import os
+
+from NeuralNetManager import NeuralNetManager
+
+DATASET_FILE = 'D:\LungCancerCTScans\SPIE-AAPM Lung CT Challenge\paths.csv'
 
 def main():
-    pass
+    manager = NeuralNetManager()
+    manager.load_ct_scans(DATASET_FILE)
 
-if __name__ == "__main__":
-    main()
+
+main()
