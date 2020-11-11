@@ -17,6 +17,11 @@ class NeuralNetManager:
         self._ct_scan_list = []
 
 
+    def print_CT_scan_modules(self):
+        for scan in self._ct_scan_list:
+            print("{}. {}".format(scan.id, scan.name))
+
+        
     #Iterates over CT scans and returns matching one or None
     def search_scan_by_id(self, id):
         for scan in self._ct_scan_list:
