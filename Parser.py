@@ -1,7 +1,7 @@
 SOURCE_PATH = 'D:/LungCancerCTScans/SPIE-AAPM Lung CT Challenge/paths.csv'
 
 class Parser:
-    """Parser which controls the NNManager"""
+    """Parser which controls the NNManager, quite rought around the edges for now..."""
 
     def __init__(self, manager):
         self._manager = manager

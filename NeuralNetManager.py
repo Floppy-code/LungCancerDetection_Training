@@ -48,8 +48,7 @@ class NeuralNetManager:
         #FORMAT
         #Path, name, x, y, z
         if path_file == None:
-            print("[!] Path file not specified!")
-            return
+            raise Exception("Path file not specified!")
 
         file = open(path_file, 'r') #Reading the .csv file
         for line in file.readlines():
