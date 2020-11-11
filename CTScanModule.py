@@ -48,19 +48,20 @@ class CTScanModule:
     #s - show slice using slice number
     #n - show nodule using id
     def show_slice(self, mode = 's', slice_no = 0):
-        size = 10
+        size = 7
         
         if (mode == 's'):
             z_location = self._slice_count - slice_no
             slice = np.copy(self._ct_scan_array[z_location])
 
-            plt.figure(figsize = size)
+            plt.figure(figsize = (size, size))
             plt.imshow(slice, cmap = 'grey')
+            plt.show()
         
         elif (mode == 'n'):
-            z_location = self._slice_count - self._nodule_location[slice_no][0]
+            z_location = self._slice_count - self._nodule_location[slice_no][2]
             x_location = self._nodule_location[slice_no][1]
-            y_location = self._nodule_location[slice_no][2]
+            y_location = self._nodule_location[slice_no][0]
         
             slice = np.copy(self._ct_scan_array[z_location])
 
@@ -74,18 +75,24 @@ class CTScanModule:
                         slice[x][y] = 1.0
 
             #Show the edited slice
-            plt.figure(figsize = size)
-            plt.imshow(slice, cmap = 'grey')
+            plt.figure(figsize = (size, size))
+            plt.imshow(slice, cmap = 'gray')
+            plt.show()
+        else:
+            raise Exception("[!]Invalid mode!")
 
 
     #Transposes the np array to (z, x, y):
     def transpose_ct_scan(self):
+        print("**Transposing {}".format(self._name))
         self._ct_scan_array = np.transpose(self._ct_scan_array, (2, 1, 0))
 
 
     #By default DICOM images have values ranging from -2000 to 3000
     #Normalization for NN is needed
     def normalize_data(self):
+        print("**Normalizing {}".format(self._name))
+
         min_val = np.min(self._ct_scan_array)
         self._ct_scan_array = self._ct_scan_array + (min_val * (-1))
         max_val = np.max(self._ct_scan_array)
