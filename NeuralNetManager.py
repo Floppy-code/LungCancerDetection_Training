@@ -23,7 +23,7 @@ class NeuralNetManager:
     def show_CT_scan(self, ct_scan_id, mode, slice_no):
         scan = self.search_scan_by_id(ct_scan_id)
         if (scan == None):
-            raise Exception("[!]Scan not found!")
+            raise Exception("Scan not found!")
         scan.show_slice(mode, int(slice_no))
 
         

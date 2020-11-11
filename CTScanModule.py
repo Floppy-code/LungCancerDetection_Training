@@ -79,7 +79,7 @@ class CTScanModule:
             plt.imshow(slice, cmap = 'gray')
             plt.show()
         else:
-            raise Exception("[!]Invalid mode!")
+            raise Exception("Invalid mode!")
 
 
     #Transposes the np array to (z, x, y):
