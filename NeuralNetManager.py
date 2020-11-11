@@ -8,8 +8,6 @@ import os
 #My imports
 from CTScanModule import CTScanModule
 
-SOURCE_PATH = 'D:/LungCancerCTScans/SPIE-AAPM Lung CT Challenge' #TODO
-
 class NeuralNetManager:
     """Manager used to create and train new neural networks using CTScanModules"""
 
