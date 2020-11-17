@@ -1,0 +1,4 @@
+medpy
+matplotlib
+numpy
+plaid-ml
