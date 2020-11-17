@@ -1,4 +1,5 @@
 medpy
 matplotlib
 numpy
-plaid-ml
+plaidml
+plaidml-keras
