@@ -13,7 +13,6 @@ class CTScanModule:
         self._nodule_count = len(self._nodule_location)
         self._is_normalized = False
 
-
     @property
     def name(self):
         return self._name
@@ -38,6 +37,10 @@ class CTScanModule:
     def slice_count(self):
         return self._slice_count
 
+    @property
+    def nodule_location(self):
+        return self._nodule_location
+
 
     def add_nodule_location(self, location):
         self._nodule_count += 1
@@ -59,7 +62,7 @@ class CTScanModule:
             plt.show()
         
         elif (mode == 'n'):
-            z_location = self._slice_count - self._nodule_location[slice_no][2]
+            z_location = self._slice_count - self._nodule_location[slice_no][2] #Slice with nodule is SliceCount - NoduleLoc
             x_location = self._nodule_location[slice_no][1]
             y_location = self._nodule_location[slice_no][0]
         
@@ -85,6 +88,7 @@ class CTScanModule:
     #Transposes the np array to (z, x, y):
     def transpose_ct_scan(self):
         print("**Transposing {}".format(self._name))
+        
         self._ct_scan_array = np.transpose(self._ct_scan_array, (2, 1, 0))
 
 
@@ -97,3 +101,5 @@ class CTScanModule:
         self._ct_scan_array = self._ct_scan_array + (min_val * (-1))
         max_val = np.max(self._ct_scan_array)
         self._ct_scan_array = self._ct_scan_array / max_val
+
+        self._ct_scan_array = self._ct_scan_array.astype('float32', copy = False)

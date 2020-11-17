@@ -24,6 +24,8 @@ class Parser:
                 self.print_request('Slice/Node number')
                 slice = input()
                 self._manager.show_CT_scan(id, mode, slice)
+            elif (keyboard_input == 't'):
+                self._manager.train_model()
             elif (keyboard_input == 'e'):
                 return
 
