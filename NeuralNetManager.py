@@ -4,6 +4,7 @@ import medpy.io
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import pickle
 
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Activation, Dense, Dropout, Flatten
@@ -12,6 +13,10 @@ from keras.callbacks import EarlyStopping
 #My imports
 from CTScanModule import CTScanModule
 import NeuralNet
+
+#GLOBAL VARIABLES
+CT_SCAN_CACHING = True  #Saves CTScanModule objects to disk to improve load times
+CT_SCAN_CACHING_PATH = '.scan_cache'
 
 class NeuralNetManager:
     """Manager used to create and train new neural networks using CTScanModules"""
@@ -142,6 +147,32 @@ class NeuralNetManager:
         if path_file == None:
             raise Exception("Path file not specified!")
 
+        #Check if cache folder exists
+        if (CT_SCAN_CACHING_PATH not in os.listdir('.') and CT_SCAN_CACHING):
+            os.mkdir(CT_SCAN_CACHING_PATH)
+
+        #Loads all scan modules which were previously cached
+        cached_scan_files = os.listdir(CT_SCAN_CACHING_PATH)
+        cached_scan_names = []
+        for filename in cached_scan_files:
+            cached_scan_names = filename.split('.')[0]
+            
+        #Load scan modules from cache
+        if (CT_SCAN_CACHING):
+            #Load from file
+            for file in cached_scan_files:
+                file = open(os.path.join(CT_SCAN_CACHING_PATH, file), 'rb')
+                loaded_scan = pickle.load(file)
+                isLoaded = False
+                for scan in self._ct_scan_list:
+                    if scan.name == loaded_scan.name:
+                        isLoaded = True
+                if (not isLoaded):
+                    self._ct_scan_list.append(loaded_scan)
+                    print('Scan "{}" loaded from cache.'.format(loaded_scan.name))
+                else:
+                    print('Scan "{}" already loaded!'.format(loaded_scan.name))
+
         file = open(path_file, 'r') #Reading the .csv file
         for line in file.readlines():
             line = line.split(';')
@@ -151,16 +182,26 @@ class NeuralNetManager:
             data = None #Optimization so CT scan is not loaded if the patient already exists
             nodule_position = (int(line[2]), int(line[3]), int(line[4]))
 
+
             #Checking if the patient already exists
             existing_scan = self.search_scan_by_name(name)
             if (existing_scan is not None):
-                existing_scan.add_nodule_location(nodule_position)
+                if (existing_scan.name not in cached_scan_names): #Check if the nodule is not being added for the secound time
+                    existing_scan.add_nodule_location(nodule_position)
             else:
                 data = self.get_dicom_data(line[0]) #Late data loading
                 CT_scan_object = CTScanModule(name, len(self._ct_scan_list), data, nodule_position)
                 CT_scan_object.normalize_data()
                 CT_scan_object.transpose_ct_scan()
                 self._ct_scan_list.append(CT_scan_object)
+
+                #Save scan modules to cache
+                if (CT_SCAN_CACHING):
+                    #Save the object ONLY if its not already cached
+                    if (CT_scan_object.name not in cached_scan_names):
+                        file = open(os.path.join(CT_SCAN_CACHING_PATH,CT_scan_object.name) + '.csm', 'wb')
+                        pickle.dump(CT_scan_object, file)
+                        print('**Scan "{}" saved to cache.'.format(CT_scan_object.name))
 
 
     #Loads DICOM data using MedPy
