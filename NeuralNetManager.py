@@ -60,9 +60,9 @@ class NeuralNetManager:
                 print("**Shapes: {} | {}".format(training_fset.shape, training_lset.shape))
 
         print("**Reshaping validation sets")
-        validation_fset = validation_fset.reshape(len(validation_fset), 512, 512, 1)
+        validation_fset = validation_fset.reshape(len(validation_fset), validation_fset.shape[1], validation_fset.shape[2], 1)
         print('**Reshaping training sets')
-        training_fset = training_fset.reshape(len(training_fset), 512, 512, 1)
+        training_fset = training_fset.reshape(len(training_fset), training_fset.shape[1], training_fset.shape[2], 1)
 
         return ((training_fset, training_lset), (validation_fset, validation_lset))
 
@@ -212,3 +212,11 @@ class NeuralNetManager:
         except:
             print("[!] Loading failed, file: {}".format(path_to_data))
         return dicom_data
+
+    def resize_ct_scans(self, new_resolution):
+        """Resizes all available CT scan datasets to resolution x resolution px"""
+        counter = 1
+        for ct_scan in self._ct_scan_list:
+            print('**Resizing dataset {}, {}/{}'.format(ct_scan.name, counter, len(self._ct_scan_list)))
+            ct_scan.resize_image(new_resolution)
+            counter += 1
