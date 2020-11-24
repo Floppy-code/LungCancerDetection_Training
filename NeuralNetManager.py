@@ -14,9 +14,14 @@ from keras.callbacks import EarlyStopping
 from CTScanModule import CTScanModule
 import NeuralNet
 
-#GLOBAL VARIABLES
-CT_SCAN_CACHING = True  #Saves CTScanModule objects to disk to improve load times
+#=============== GLOBAL VARIABLES ===============
+#Saves CTScanModule objects to disk to improve load times
+CT_SCAN_CACHING = True  
 CT_SCAN_CACHING_PATH = '.scan_cache'
+#Saves training stats after every epoch into file
+TRAINING_HISTORY = True  
+TRAINING_HISTORY_VAL_ACC = 'val_acc_training.txt'
+TRAINING_HISTORY_ACC = 'acc_training.txt'
 
 class NeuralNetManager:
     """Manager used to create and train new neural networks using CTScanModules"""
@@ -68,6 +73,7 @@ class NeuralNetManager:
 
 
     def train_model(self):
+        model_name = 'WH_No_data_augumentation' #Used for statistics
         for current_fold in range(0, self._number_of_folds):
             #Data
             data = self.generate_fset(current_fold)
@@ -86,10 +92,25 @@ class NeuralNetManager:
             #        plt.show()
 
             #Training
+            #model = NeuralNet.get_neural_net_WH()
             model = NeuralNet.get_neural_net_WH()
-            model.fit(feature_set_training, label_set_training, batch_size = 16, epochs = 10, verbose = 1, validation_data = (feature_set_validation, label_set_validation))
+            history = model.fit(feature_set_training, label_set_training, batch_size = 32, epochs = 10, verbose = 1, validation_data = (feature_set_validation, label_set_validation))
+            
+            #Saving
+            if (TRAINING_HISTORY):
+                self.save_training_statistics(history.history['val_acc'], model_name, current_fold)
+                self.save_training_statistics(history.history['accuracy'], model_name, current_fold)
 
 
+    def save_training_statistics(self, file_path, data_to_save, model_name, model_fold):
+        save_file = open(file_path, 'a+')
+        save_file.write(model_name + ' fold: {}'.format(model_fold))
+        for value in data_to_save:
+            save_file.write(';{}'.format(value))
+        save_file.write('\n')
+        save_file.close()
+    
+            
     def get_fset_single(self, ct_scan_index):
         if (ct_scan_index >= len(self._ct_scan_list)):
             raise Exception("Scan index out of bounds!")
