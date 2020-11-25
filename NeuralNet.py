@@ -61,7 +61,7 @@ def get_neural_net_VGG19():
     model.add(Dropout(0.5))
 
     model.add(Dense(1))
-    model.add(Activation('softmax'))
+    model.add(Activation('sigmoid'))
 
     model.compile(optimizer = 'Adam', loss = 'binary_crossentropy', metrics = ['accuracy'])
     model.summary()
@@ -93,7 +93,7 @@ def get_neural_net_WH():
     model.add(Activation('relu'))
 
     model.add(Dense(1))
-    model.add(Activation('softmax'))
+    model.add(Activation('sigmoid'))
 
     model.compile(optimizer = 'Adam', loss = 'binary_crossentropy', metrics = ['accuracy'])
     model.summary()

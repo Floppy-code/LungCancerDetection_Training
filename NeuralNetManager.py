@@ -5,9 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pickle
+import random
 
-from keras.models import Sequential
-from keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Activation, Dense, Dropout, Flatten
 from keras.callbacks import EarlyStopping
 
 #My imports
@@ -18,10 +17,16 @@ import NeuralNet
 #Saves CTScanModule objects to disk to improve load times
 CT_SCAN_CACHING = True  
 CT_SCAN_CACHING_PATH = '.scan_cache'
+
 #Saves training stats after every epoch into file
 TRAINING_HISTORY = True  
 TRAINING_HISTORY_VAL_ACC = 'val_acc_training.txt'
 TRAINING_HISTORY_ACC = 'acc_training.txt'
+
+#Data augumentation
+UNDERSAMPLING = 1
+OVERSAMPLING = 2
+
 
 class NeuralNetManager:
     """Manager used to create and train new neural networks using CTScanModules"""
@@ -32,13 +37,100 @@ class NeuralNetManager:
         self._number_of_folds = 10
 
 
-    def generate_fset(self, fold_to_use):
+    def train_model(self):
+        model_name = 'WH_No_data_augumentation' #Used for statistics
+        for current_fold in range(0, self._number_of_folds):
+            #Data
+            data = self.generate_fset(current_fold, OVERSAMPLING)
+            
+            feature_set_training = data[0][0]
+            label_set_training = data[0][1]
+
+            feature_set_validation = data[1][0]
+            label_set_validation = data[1][1]
+
+            #DEBUG
+            #Checking if the dataset is alright
+            #for i in range(0, len(label_set_training)):
+            #    if label_set_training[i] == True:
+            #        plt.imshow(feature_set_training[i], cmap = 'gray')
+            #        plt.show()
+            #for i in range(0, len(label_set_training)):
+            #    if label_set_training[i] == True:
+            #        print(label_set_training[i])
+            #        print(label_set_training[i - 1])
+
+            #Training
+            #model = NeuralNet.get_neural_net_WH()
+            model = NeuralNet.get_neural_net_WH()
+            history = model.fit(feature_set_training, label_set_training, batch_size = 32, epochs = 10, verbose = 1, validation_data = (feature_set_validation, label_set_validation))
+            
+            #Saving
+            if (TRAINING_HISTORY):
+                self.save_training_statistics(TRAINING_HISTORY_VAL_ACC, history.history['val_acc'], model_name, current_fold)
+                self.save_training_statistics(TRAINING_HISTORY_ACC, history.history['acc'], model_name, current_fold)
+
+
+    def random_sampler(self, feature_set, label_set, mode = 1):
+        """Implementation of random over and undersampler"""
+        #Modes: 1 - undersampling
+        #       2 - oversampling
+        #Return (feature_set, label_set)
+        positive_indexes = [] #For oversampler
+        negative_indexes = [] #TODO
+
+        positive = 0
+        for i in range(0, len(label_set)):
+            if (label_set[i] == True):
+                positive += 1
+                positive_indexes.append(i)
+        negative = len(label_set) - positive
+
+        if (mode == UNDERSAMPLING): #Random undersmapler implementation TODO
+            pass 
+        elif (mode == OVERSAMPLING): #Random oversampler implementation
+            copies_fset = []
+            copies_lset = []
+            while (positive != negative):
+                rand_index = random.randint(0, len(positive_indexes) - 1)
+                copies_fset.append(np.copy(feature_set[positive_indexes[rand_index]]))
+                copies_lset.append(1.0)
+
+                positive_indexes.append(len(label_set) - 1)
+                positive += 1
+
+                print('\r**Oversampling {}/{}'.format(positive, negative), end = '')
+                if (positive == negative): 
+                    print('...DONE')
+
+
+            copies_fset = np.array(copies_fset)
+            copies_fset = np.reshape(copies_fset, (len(copies_fset), feature_set.shape[1], feature_set.shape[2]))
+
+            copies_lset = np.array(copies_lset)
+
+            feature_set = np.concatenate((feature_set, copies_fset), axis = 0)
+            label_set = np.concatenate((label_set, copies_lset), axis = 0)
+
+            return (feature_set, label_set)
+
+        
+    def generate_fset(self, fold_to_use, data_aug_options = 0):
         """Returns a touple with ((training_fset, training_lset), (validation_fset, validation_lset))"""
         #Feature set shape - (len(fset), 512, 512, 1)
         #STEPS
         #1. Generate all 10 fsets
         #2. Keep 9 together and use 1 as validation
         #3. Test on the rest...
+
+        #DATA AUGUMENTATION
+        #0 - do nothing
+        #1 - undersampling
+        #2 - oversampling
+
+        if (data_aug_options < 0 and data_aug_options > 2):
+            raise Exception("Invalid data augumentation option!")
+
         training_fset = None
         training_lset = None
 
@@ -49,6 +141,7 @@ class NeuralNetManager:
         validation_fset = self.get_fset_single(fold_to_use)
         validation_lset = self.get_lset_single(fold_to_use)
 
+        #Generating training and validation sets, splitting folds...
         for i in range(0, len(self._ct_scan_list)):
             if (i != fold_to_use):
                 print("**Generating training Feature and Label set for fold: {}/{}".format(i + 1, self._number_of_folds))
@@ -64,42 +157,26 @@ class NeuralNetManager:
 
                 print("**Shapes: {} | {}".format(training_fset.shape, training_lset.shape))
 
+        #Data augumentation
+        if (data_aug_options != 0):
+            if (data_aug_options == UNDERSAMPLING):
+                pass #TODO
+            elif (data_aug_options == OVERSAMPLING):
+                temp_training = self.random_sampler(training_fset, training_lset, OVERSAMPLING)
+                training_fset = temp_training[0]
+                training_lset = temp_training[1]
+                
+                temp_validation = self.random_sampler(validation_fset, validation_lset, OVERSAMPLING)
+                validation_fset = temp_validation[0]
+                validation_lset = temp_validation[1]
+
+        #Reshaping for CNN
         print("**Reshaping validation sets")
         validation_fset = validation_fset.reshape(len(validation_fset), validation_fset.shape[1], validation_fset.shape[2], 1)
         print('**Reshaping training sets')
         training_fset = training_fset.reshape(len(training_fset), training_fset.shape[1], training_fset.shape[2], 1)
 
         return ((training_fset, training_lset), (validation_fset, validation_lset))
-
-
-    def train_model(self):
-        model_name = 'WH_No_data_augumentation' #Used for statistics
-        for current_fold in range(0, self._number_of_folds):
-            #Data
-            data = self.generate_fset(current_fold)
-            
-            feature_set_training = data[0][0]
-            label_set_training = data[0][1]
-
-            feature_set_validation = data[1][0]
-            label_set_validation = data[1][1]
-
-            ##DEBUG
-            ##Checking if the dataset is alright
-            #for i in range(0, len(label_set_training)):
-            #    if label_set_training[i] == True:
-            #        plt.imshow(feature_set_training[i], cmap = 'gray')
-            #        plt.show()
-
-            #Training
-            #model = NeuralNet.get_neural_net_WH()
-            model = NeuralNet.get_neural_net_WH()
-            history = model.fit(feature_set_training, label_set_training, batch_size = 32, epochs = 10, verbose = 1, validation_data = (feature_set_validation, label_set_validation))
-            
-            #Saving
-            if (TRAINING_HISTORY):
-                self.save_training_statistics(history.history['val_acc'], model_name, current_fold)
-                self.save_training_statistics(history.history['accuracy'], model_name, current_fold)
 
 
     def save_training_statistics(self, file_path, data_to_save, model_name, model_fold):
@@ -125,10 +202,10 @@ class NeuralNetManager:
         
         ct_scan_module = self.search_scan_by_id(ct_scan_index)
         s_count = ct_scan_module.slice_count
-        label_set = np.full((s_count), False)
+        label_set = np.full((s_count), 0.0)
         
         for loc in ct_scan_module.nodule_location:
-            label_set[s_count - loc[2]] = True
+            label_set[s_count - loc[2]] = 1.0
 
         return label_set
 
@@ -211,7 +288,7 @@ class NeuralNetManager:
                     existing_scan.add_nodule_location(nodule_position)
             else:
                 data = self.get_dicom_data(line[0]) #Late data loading
-                CT_scan_object = CTScanModule(name, len(self._ct_scan_list), data, nodule_position)
+                CT_scan_object = CTScanModule(name, len(self._ct_scan_list), data, nodule_position)             
                 CT_scan_object.normalize_data()
                 CT_scan_object.transpose_ct_scan()
                 self._ct_scan_list.append(CT_scan_object)

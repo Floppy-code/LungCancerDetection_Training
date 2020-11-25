@@ -6,7 +6,7 @@ from Parser import Parser
 
 def main():
     manager = NeuralNetManager()
-    #Skip parser for now
+
     #parser = Parser(manager)
     #parser.parse()
 
