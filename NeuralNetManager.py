@@ -38,10 +38,10 @@ class NeuralNetManager:
 
 
     def train_model(self):
-        model_name = 'WH_No_data_augumentation' #Used for statistics
+        model_name = 'WH_undersampling_dropout' #Used for statistics
         for current_fold in range(0, self._number_of_folds):
             #Data
-            data = self.generate_fset(current_fold, OVERSAMPLING)
+            data = self.generate_fset(current_fold, UNDERSAMPLING)
             
             feature_set_training = data[0][0]
             label_set_training = data[0][1]
@@ -63,7 +63,11 @@ class NeuralNetManager:
             #Training
             #model = NeuralNet.get_neural_net_WH()
             model = NeuralNet.get_neural_net_WH()
-            history = model.fit(feature_set_training, label_set_training, batch_size = 32, epochs = 10, verbose = 1, validation_data = (feature_set_validation, label_set_validation))
+            history = model.fit(feature_set_training, label_set_training,
+                                batch_size = 16,
+                                epochs = 10,
+                                verbose = 1,
+                                validation_data = (feature_set_validation, label_set_validation))
             
             #Saving
             if (TRAINING_HISTORY):
@@ -77,24 +81,50 @@ class NeuralNetManager:
         #       2 - oversampling
         #Return (feature_set, label_set)
         positive_indexes = [] #For oversampler
-        negative_indexes = [] #TODO
+        negative_indexes = [] #For undersampler
 
         positive = 0
         for i in range(0, len(label_set)):
-            if (label_set[i] == True):
+            if (np.max(label_set[i]) == 1.0):
                 positive += 1
                 positive_indexes.append(i)
-        negative = len(label_set) - positive
 
         if (mode == UNDERSAMPLING): #Random undersmapler implementation TODO
-            pass 
+            copies_fset = []
+            copies_lset = []
+            negative = 0
+            while(negative != positive):
+                rand_index = random.randint(0, label_set.shape[0])
+                if (rand_index not in positive_indexes and rand_index not in negative_indexes):
+                    negative_indexes.append(rand_index)
+                negative += 1
+                print('\r**Undersampling {}/{}'.format(negative, positive), end = '')
+                if (negative == positive):
+                    print('...DONE')
+
+            for index in positive_indexes:
+                copies_fset.append(np.copy(feature_set[index]))
+                copies_lset.append(1.0) #TODO rework for arrays
+                   
+            for index in negative_indexes:
+                copies_fset.append(np.copy(feature_set[index]))
+                copies_lset.append(0.0) #TODO rework for arrays
+
+            copies_fset = np.array(copies_fset)
+            copies_fset = np.reshape(copies_fset, (len(copies_fset), feature_set.shape[1], feature_set.shape[2]))
+
+            copies_lset = np.array(copies_lset)
+
+            return ((copies_fset, copies_lset))
+
         elif (mode == OVERSAMPLING): #Random oversampler implementation
+            negative = label_set.shape[0] - positive
             copies_fset = []
             copies_lset = []
             while (positive != negative):
                 rand_index = random.randint(0, len(positive_indexes) - 1)
                 copies_fset.append(np.copy(feature_set[positive_indexes[rand_index]]))
-                copies_lset.append(1.0)
+                copies_lset.append(1.0) #TODO rework for arrays
 
                 positive_indexes.append(len(label_set) - 1)
                 positive += 1
@@ -159,16 +189,21 @@ class NeuralNetManager:
 
         #Data augumentation
         if (data_aug_options != 0):
+            temp_training = None
+            temp_validation = None
+
             if (data_aug_options == UNDERSAMPLING):
-                pass #TODO
+                temp_training = self.random_sampler(training_fset, training_lset, UNDERSAMPLING)
+                temp_validation = self.random_sampler(validation_fset, validation_lset, UNDERSAMPLING)
             elif (data_aug_options == OVERSAMPLING):
                 temp_training = self.random_sampler(training_fset, training_lset, OVERSAMPLING)
-                training_fset = temp_training[0]
-                training_lset = temp_training[1]
-                
                 temp_validation = self.random_sampler(validation_fset, validation_lset, OVERSAMPLING)
-                validation_fset = temp_validation[0]
-                validation_lset = temp_validation[1]
+            
+            training_fset = temp_training[0]
+            training_lset = temp_training[1]
+            
+            validation_fset = temp_validation[0]
+            validation_lset = temp_validation[1]
 
         #Reshaping for CNN
         print("**Reshaping validation sets")
@@ -310,6 +345,7 @@ class NeuralNetManager:
         except:
             print("[!] Loading failed, file: {}".format(path_to_data))
         return dicom_data
+
 
     def resize_ct_scans(self, new_resolution):
         """Resizes all available CT scan datasets to resolution x resolution px"""
