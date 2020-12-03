@@ -60,10 +60,10 @@ def get_neural_net_VGG19():
     model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
-    model.add(Dense(1))
-    model.add(Activation('sigmoid'))
+    model.add(Dense(256))
+    model.add(Activation('softmax'))
 
-    model.compile(optimizer = 'Adam', loss = 'binary_crossentropy', metrics = ['accuracy'])
+    model.compile(optimizer = 'Adam', loss = 'categorical_crossentropy', metrics = ['accuracy'])
     model.summary()
     
     return model
@@ -78,33 +78,24 @@ def get_neural_net_WH():
     model.add(Conv2D(64, (3,3), input_shape = NN_SHAPE, padding = 'same')) #Width, Height, Colors
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size = (2,2)))
-    model.add(Dropout(0.25))
 
     model.add(Conv2D(128, (3,3), padding = 'same'))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size = (2,2)))
-    model.add(Dropout(0.25))
+    model.add(MaxPooling2D(pool_size = (4,4)))
 
     model.add(Conv2D(256, (3,3), padding = 'same'))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size = (2,2)))
-    model.add(Dropout(0.25))
-
-    model.add(Conv2D(512, (3,3), padding = 'same'))
-    model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size = (2,2)))
-    model.add(Dropout(0.25))
 
     model.add(Flatten())
 
     model.add(Dense(1024))
     model.add(Activation('relu'))
-    model.add(Dropout(0.5))
 
-    model.add(Dense(1))
-    model.add(Activation('sigmoid'))
+    model.add(Dense(64 + 1))
+    model.add(Activation('softmax'))
 
-    model.compile(optimizer = 'Adam', loss = 'binary_crossentropy', metrics = ['accuracy'])
+    model.compile(optimizer = 'Adamax', loss = 'categorical_crossentropy', metrics = ['accuracy'])
     model.summary()
     
     return model

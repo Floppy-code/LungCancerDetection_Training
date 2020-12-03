@@ -80,7 +80,7 @@ class CTScanModule:
             slice = np.copy(self._ct_scan_array[z_location])
 
             #Draw square around the nodule
-            offset = 10 #px
+            offset = 8 #px
             for x in range(x_location - offset, x_location + offset):
                 for y in range(y_location - offset, y_location + offset):
                     if (x == x_location - offset or x == x_location + offset - 1):
