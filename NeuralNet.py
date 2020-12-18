@@ -92,10 +92,10 @@ def get_neural_net_WH():
     model.add(Dense(1024))
     model.add(Activation('relu'))
 
-    model.add(Dense(64 + 1))
-    model.add(Activation('softmax'))
+    model.add(Dense(1))
+    model.add(Activation('sigmoid'))
 
-    model.compile(optimizer = 'Adamax', loss = 'categorical_crossentropy', metrics = ['accuracy'])
+    model.compile(optimizer = 'Adam', loss = 'binary_crossentropy', metrics = ['accuracy'])
     model.summary()
     
     return model
