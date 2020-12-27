@@ -72,16 +72,14 @@ class NeuralNetManager:
 
             #Training
             #model = NeuralNet.get_neural_net_WH()
-            model = NeuralNet.get_neural_net_WH()
+            model = NeuralNet.get_neural_net_VGG19()
             history = model.fit(feature_set_training, label_set_training,
-                                batch_size = 16,
+                                batch_size = 32,
                                 epochs = 40,
                                 verbose = 1,
                                 validation_data = (feature_set_validation, label_set_validation))
             
-            #Saving TODO
-            model.save(MODEL_SAVE_PATH)
-            break
+            model.save(MODEL_SAVE_PATH) #TODO For every fold
 
             #Saving
             if (TRAINING_HISTORY):
@@ -229,8 +227,9 @@ class NeuralNetManager:
             training_fset = temp_training[0]
             training_lset = temp_training[1]
             
-            validation_fset = temp_validation[0]
-            validation_lset = temp_validation[1]
+            #[!] WARNING: Turned off undersampling/oversampling for validation set.
+            #validation_fset = temp_validation[0]
+            #validation_lset = temp_validation[1]
 
         #Reshaping for CNN
         print("**Reshaping validation sets")
