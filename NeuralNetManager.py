@@ -16,7 +16,7 @@ import NeuralNet
 
 #=============== GLOBAL VARIABLES ===============
 #Saves CTScanModule objects to disk to improve load times / data loading
-CT_SCAN_CACHING = False  
+CT_SCAN_CACHING = True  
 CT_SCAN_CACHING_PATH = '.scan_cache'
 RESIZE_ON_LOAD = True
 RESIZE_DEFAULT_VAL = 256
@@ -54,16 +54,19 @@ class NeuralNetManager:
 
 
     def train_model(self):
-        model_name = 'Overfitting_Example' #Used for statistics
+        model_name = 'LUNA16_Dataset_Experiment1' #Used for statistics
         for current_fold in range(0, self._number_of_folds):
             #Data
-            data = self.generate_fset(current_fold, NONE, ONE_HOT)
+            data = self.generate_fset(current_fold, OVERSAMPLING, ONE_HOT)
             
             feature_set_training = data[0][0]
             label_set_training = data[0][1]
 
             feature_set_validation = data[1][0]
             label_set_validation = data[1][1]
+
+            unique, counts = np.unique(label_set_training, return_counts=True)
+            print(dict(zip(unique, counts)))
 
             #DEBUG
             #Checking if the dataset is alright
@@ -77,13 +80,14 @@ class NeuralNetManager:
             #        print(label_set_training[i - 1])
 
             #Training
-            #model = NeuralNet.get_neural_net_WH()
-            model = NeuralNet.get_neural_net_VGG19()
+            model = NeuralNet.get_neural_net_WH()
+            #model = NeuralNet.get_neural_net_VGG19()
             history = model.fit(feature_set_training, label_set_training,
-                                batch_size = 32,
-                                epochs = 40,
+                                batch_size = 16,
+                                epochs = 16,
                                 verbose = 1,
-                                validation_data = (feature_set_validation, label_set_validation))
+                                validation_data = (feature_set_validation, label_set_validation),
+                                shuffle = True)
             
             model.save(MODEL_SAVE_PATH) #TODO For every fold
 
@@ -96,8 +100,6 @@ class NeuralNetManager:
 
 
     def random_sampler(self, feature_set, label_set, mode = 1):
-        #[!] WARNING: Unusable on LUNA16 Dataset! WIP
-        raise Exception("Not implemented!");
         """Implementation of random over and undersampler"""
         #Modes: 1 - undersampling
         #       2 - oversampling
@@ -108,7 +110,7 @@ class NeuralNetManager:
         positive = 0
         #[!] WARNING: Random sampler for heatmaps not implemented yet!
         for i in range(0, len(label_set)):
-            if (label_set[i] == 1.0):
+            if (label_set[i] == True):
                 positive += 1
                 positive_indexes.append(i)
 
@@ -139,7 +141,7 @@ class NeuralNetManager:
 
             copies_lset = np.array(copies_lset)
 
-            return ((copies_fset, copies_lset))
+            return (copies_fset, copies_lset)
 
         elif (mode == OVERSAMPLING): #Random oversampler implementation
             negative = label_set.shape[0] - positive
@@ -150,7 +152,6 @@ class NeuralNetManager:
                 copies_fset.append(np.copy(feature_set[positive_indexes[rand_index]]))
                 copies_lset.append(np.copy(label_set[positive_indexes[rand_index]]))
 
-                positive_indexes.append(len(label_set) - 1)
                 positive += 1
 
                 print('\r**Oversampling {}/{}'.format(positive, negative), end = '')
@@ -169,7 +170,7 @@ class NeuralNetManager:
             return (feature_set, label_set)
 
         
-    def generate_fset(self, fold_to_use, data_aug_options = 0, label_set_mode = ONE_HOT):
+    def generate_fset(self, fold_to_use, data_aug_options = NONE, label_set_mode = ONE_HOT):
         """Returns a touple with ((training_fset, training_lset), (validation_fset, validation_lset))"""
         #Feature set shape - (len(fset), 512, 512, 1)
         #STEPS
@@ -188,39 +189,39 @@ class NeuralNetManager:
             raise Exception("Invalid label set mode!")
 
         training_fset = None
-        training_lset = None
+        training_lset = np.array([])
 
         validation_fset = None
-        validation_lset = None
+        validation_lset = np.array([])
 
         print("**Generating validation Feature and Label set")
-        validation_fset = self.get_fset_single(fold_to_use)
-        validation_lset = self.get_lset_single(fold_to_use, label_set_mode)
+        #How many sets will be in a fold
+        dataset_count_to_use = int(len(self._ct_scan_list) / self._number_of_folds) 
+        
+        #Select indexes supposed to be in training and validation folds
+        validation_scans = [x for x in range(fold_to_use * dataset_count_to_use, fold_to_use * dataset_count_to_use + dataset_count_to_use)]
+        print(validation_scans)
 
-        #Generating training and validation sets, splitting folds...
+        #Iterate over all sets and add them to corresponding sets
         for i in range(0, len(self._ct_scan_list)):
-            if (i != fold_to_use):
-                print("**Generating training Feature and Label set for fold: {}/{}".format(i + 1, self._number_of_folds))
-                if (training_fset is None):
+            print('\r**Processing dataset: {}/{}'.format(i + 1, len(self._ct_scan_list)), end = '')
+            if (i not in validation_scans):
+                if (training_fset is None): 
                     training_fset = self.get_fset_single(i)
                 else:
-                    training_fset = np.concatenate((training_fset, self.get_fset_single(i)), axis = 0)
-                
-                if (training_lset is None):
-                    if (label_set_mode == ONE_HOT):
-                        training_lset = self.get_lset_single(i, ONE_HOT)
-                    else:
-                        training_lset = np.array(self.get_lset_single(i, HEATMAP))
+                    training_fset = np.concatenate((training_fset, self.get_fset_single(i)), 0)
+                training_lset = np.concatenate((training_lset, self.get_lset_single(i)))
+            else:
+                if (validation_fset is None):
+                    validation_fset = self.get_fset_single(i)
                 else:
-                    if (label_set_mode == ONE_HOT):
-                        training_lset = np.append(training_lset, self.get_lset_single(i, ONE_HOT))
-                    else:
-                        training_lset = np.concatenate((training_lset, np.array(self.get_lset_single(i, HEATMAP))), axis = 0)
+                    validation_fset = np.concatenate((validation_fset, self.get_fset_single(i)), 0)
+                validation_lset = np.concatenate((validation_lset, self.get_lset_single(i)))
+        print('')
 
-        print("**Shapes: {} | {}".format(training_fset.shape, training_lset.shape))
-        validation_lset = np.array(validation_lset)
 
-        #Data augumentation
+        #Data augumentation=========================================================
+        #[!] WARNING: Do not use! May not work anymore!!!! More testing needed.
         if (data_aug_options != 0):
             temp_training = None
             temp_validation = None
@@ -234,20 +235,17 @@ class NeuralNetManager:
             
             training_fset = temp_training[0]
             training_lset = temp_training[1]
-            
-            #[!] WARNING: Turned off undersampling/oversampling for validation set.
-            #validation_fset = temp_validation[0]
-            #validation_lset = temp_validation[1]
+
+            validation_fset = temp_validation[0]
+            validation_lset = temp_validation[1]
+        #Data augumentation=========================================================
 
         #Reshaping for CNN
         print("**Reshaping validation sets")
         validation_fset = validation_fset.reshape(len(validation_fset), validation_fset.shape[1], validation_fset.shape[2], 1)
-        if (label_set_mode == HEATMAP):
-            validation_lset = np.reshape(validation_lset, (len(validation_lset), validation_lset.shape[1]))
         print('**Reshaping training sets')
         training_fset = training_fset.reshape(len(training_fset), training_fset.shape[1], training_fset.shape[2], 1)
-        if (label_set_mode == HEATMAP):
-            training_lset = np.reshape(training_lset, (len(training_lset), training_lset.shape[1]))
+        print("**Shapes: Training {} {} \n          Validation: {} {}".format(training_fset.shape, training_lset.shape, validation_fset.shape, validation_lset.shape))
 
         return ((training_fset, training_lset), (validation_fset, validation_lset))
 
@@ -278,11 +276,11 @@ class NeuralNetManager:
         if (lset_mode == ONE_HOT):
             ct_scan_module = self.search_scan_by_id(ct_scan_index)
             slice_count = ct_scan_module.slice_count
-            label_set = np.full((slice_count), 0.0) #Fils label set with 0.0 values
+            label_set = np.full(slice_count, False) #Fils label set with 0.0 values
         
             #Iterates over all nodule locations and adds 1.0 when z axis is positive
             for loc in ct_scan_module.nodule_location:
-                label_set[loc[2]] = 1.0
+                label_set[loc[2]] = True
 
             return label_set
         

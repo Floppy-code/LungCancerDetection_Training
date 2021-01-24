@@ -75,7 +75,6 @@ class CTScanModule:
             converted = self.convert_world_to_voxel_coords(location)
             self._nodule_count += 1 
             #[!] WARNING: This doesnt check if the node location isnt already in the list, may create duplicates!
-            print("Voxel (x,y,z): {}".format(converted.astype(int)))
             self._nodule_location.append(converted.astype(int)) 
         else:
             raise Exception("Invalid coordinates!")

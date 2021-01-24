@@ -74,22 +74,29 @@ def get_neural_net_WH():
     
     #PROOF OF CONCEPT MODEL
     model = Sequential()
+    
+    #256px in
+    model.add(Conv2D(16, (3,3), input_shape = NN_SHAPE, padding = 'same')) #Width, Height, Colors
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size = (2,2)))
 
-    model.add(Conv2D(64, (3,3), input_shape = NN_SHAPE, padding = 'same')) #Width, Height, Colors
+    model.add(Conv2D(32, (3,3), padding = 'same'))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size = (4,4)))
+
+    model.add(Conv2D(64, (3,3), padding = 'same'))
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size = (2,2)))
 
     model.add(Conv2D(128, (3,3), padding = 'same'))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size = (4,4)))
-
-    model.add(Conv2D(256, (3,3), padding = 'same'))
-    model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size = (2,2)))
 
     model.add(Flatten())
 
     model.add(Dense(1024))
+    model.add(Activation('relu'))
+
+    model.add(Dense(512))
     model.add(Activation('relu'))
 
     model.add(Dense(1))
