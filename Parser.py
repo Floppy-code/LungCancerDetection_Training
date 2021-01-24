@@ -1,4 +1,4 @@
-SOURCE_PATH = 'D:/LungCancerCTScans/SPIE-AAPM Lung CT Challenge/paths.csv'
+SOURCE_PATH = 'D:/LungCancerCTScans/LUNA16/foldersToLoad.csv'
 
 class Parser:
     """Parser which controls the NNManager, quite rought around the edges for now..."""
@@ -13,7 +13,7 @@ class Parser:
             keyboard_input = input()
 
             if (keyboard_input == 'l'):
-                self._manager.load_ct_scans(SOURCE_PATH) #TODO
+                self._manager.load_ct_scans(SOURCE_PATH)
             elif (keyboard_input == 'p'):
                 self._manager.print_CT_scan_modules()
             elif (keyboard_input == 's'):

@@ -1,6 +1,7 @@
 #3rd party imports
 import medpy
 import medpy.io
+import SimpleITK as sitk
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -14,12 +15,14 @@ from CTScanModule import CTScanModule
 import NeuralNet
 
 #=============== GLOBAL VARIABLES ===============
-#Saves CTScanModule objects to disk to improve load times
-CT_SCAN_CACHING = True  
+#Saves CTScanModule objects to disk to improve load times / data loading
+CT_SCAN_CACHING = False  
 CT_SCAN_CACHING_PATH = '.scan_cache'
+RESIZE_ON_LOAD = True
+RESIZE_DEFAULT_VAL = 256
 
 #Saves training stats after every epoch into file
-TRAINING_HISTORY = True  
+TRAINING_HISTORY = False  
 TRAINING_HISTORY_VAL_ACC = 'val_acc_training.txt'
 TRAINING_HISTORY_ACC = 'acc_training.txt'
 TRAINING_HISTORY_VAL_LOSS = 'val_loss_training.txt'
@@ -37,6 +40,9 @@ OVERSAMPLING = 2
 #CNN Model
 MODEL_SAVE_PATH = 'last_model.h5'
 
+#Annotations file path
+ANOTATIONS_PATH = 'D:/LungCancerCTScans/LUNA16/annotations.csv'
+
 
 class NeuralNetManager:
     """Manager used to create and train new neural networks using CTScanModules"""
@@ -51,7 +57,7 @@ class NeuralNetManager:
         model_name = 'Overfitting_Example' #Used for statistics
         for current_fold in range(0, self._number_of_folds):
             #Data
-            data = self.generate_fset(current_fold, OVERSAMPLING, ONE_HOT)
+            data = self.generate_fset(current_fold, NONE, ONE_HOT)
             
             feature_set_training = data[0][0]
             label_set_training = data[0][1]
@@ -90,6 +96,8 @@ class NeuralNetManager:
 
 
     def random_sampler(self, feature_set, label_set, mode = 1):
+        #[!] WARNING: Unusable on LUNA16 Dataset! WIP
+        raise Exception("Not implemented!");
         """Implementation of random over and undersampler"""
         #Modes: 1 - undersampling
         #       2 - oversampling
@@ -274,23 +282,18 @@ class NeuralNetManager:
         
             #Iterates over all nodule locations and adds 1.0 when z axis is positive
             for loc in ct_scan_module.nodule_location:
-                label_set[slice_count - loc[2]] = 1.0
+                label_set[loc[2]] = 1.0
 
             return label_set
         
         
         elif (lset_mode == HEATMAP):
             raise Exception("Heatmaps not implemented!")
-
-
-    def set_element(self, array, width, row, col, value):
-        """Utility function, sets value in 1D using 2D location"""
-        array[width * row + col] = value
             
         
     def print_CT_scan_modules(self):
         for scan in self._ct_scan_list:
-            print("{}. {}".format(scan.id, scan.name))
+            print("{}. {} Nodes: {}".format(scan.id, scan.name, scan.nodule_count))
 
 
     def show_CT_scan(self, ct_scan_id, mode, slice_no):
@@ -315,15 +318,32 @@ class NeuralNetManager:
                 return scan
         return None
 
-    #Loads all CT scans from .csv file, in a case that a patient has more than one nodule, it tries to
-    #find an existing patient first
-    def load_ct_scans(self, path_file = None):
+
+    def load_nodes_single(self, path_file, scan_instance):
+        '''Iterates over list of anotations and appends them to the corresponding CTScanModule instance'''
+        #Filter out datasets that are not loaded
+        if path_file == None:
+            raise Exception("Path file not specified!")
+        if scan_instance == None:
+            raise Exception("Nullpointer to scan instance!")
+        
+        annotations_file = open(path_file, 'r')
+        for line in annotations_file.readlines():
+            line = line.split(',')
+            if (line[0] == scan_instance.name):
+                nodule_location = (float(line[1]), float(line[2]), float(line[3]))
+                scan_instance.add_nodule_location(nodule_location, 1)
+                
+
+    def load_ct_scans(self, path_file):
+        '''Loads ct scans as 3D numpy array and saves them as an CTScanModule instance'''
         #FORMAT
         #Path, name, x, y, z
         if path_file == None:
             raise Exception("Path file not specified!")
 
         #Load scan modules from cache
+        cached_scan_names = []
         if (CT_SCAN_CACHING):
                     #Check if cache folder exists
             if (CT_SCAN_CACHING_PATH not in os.listdir('.') and CT_SCAN_CACHING):
@@ -331,7 +351,6 @@ class NeuralNetManager:
 
             #Loads all scan modules which were previously cached
             cached_scan_files = os.listdir(CT_SCAN_CACHING_PATH)
-            cached_scan_names = []
             for filename in cached_scan_files:
                 cached_scan_names = filename.split('.')[0]
 
@@ -345,39 +364,40 @@ class NeuralNetManager:
                         isLoaded = True
                 if (not isLoaded):
                     self._ct_scan_list.append(loaded_scan)
-                    print('Scan "{}" loaded from cache.'.format(loaded_scan.name))
+                    print('**Scan "{}" loaded from cache.'.format(loaded_scan.name))
                 else:
                     print('Scan "{}" already loaded!'.format(loaded_scan.name))
 
         file = open(path_file, 'r') #Reading the .csv file
         for line in file.readlines():
-            line = line.split(';')
-            
-            #Splitting the data into relevant groups
-            name = line[1]
-            data = None #Optimization so CT scan is not loaded if the patient already exists
-            nodule_position = (int(line[2]), int(line[3]), int(line[4]))
+            #Find all .mhd paths from the subfolder
+            line = line.replace('\n', '')
+            files_in_folder = os.listdir(line)
+            files_in_folder = [filename for filename in files_in_folder if '.mhd' in filename]
 
+            #Load .mhd files from folder
+            for file in files_in_folder:
+                name = file.split(".mhd")[0]
+                #Checking if the scan module isnt already loaded
+                if (name not in [scan.name for scan in self._ct_scan_list]):
+                    dicom_data, dicom_header = self.get_dicom_data(os.path.join(line, file))
+                
+                    #Create new CTScanModule instance for data
+                    scan_instance = CTScanModule(name, len(self._ct_scan_list), dicom_data, dicom_header)
+                    scan_instance.normalize_data()
+                    scan_instance.transpose_ct_scan()
+                    self.load_nodes_single(ANOTATIONS_PATH, scan_instance)
+                    if (RESIZE_ON_LOAD):
+                        scan_instance.resize_image(RESIZE_DEFAULT_VAL)
+                    self._ct_scan_list.append(scan_instance)
 
-            #Checking if the patient already exists
-            existing_scan = self.search_scan_by_name(name)
-            if (existing_scan is not None):
-                if (existing_scan.name not in cached_scan_names): #Check if the nodule is not being added for the secound time
-                    existing_scan.add_nodule_location(nodule_position)
-            else:
-                data = self.get_dicom_data(line[0]) #Late data loading
-                CT_scan_object = CTScanModule(name, len(self._ct_scan_list), data, nodule_position)             
-                CT_scan_object.normalize_data()
-                CT_scan_object.transpose_ct_scan()
-                self._ct_scan_list.append(CT_scan_object)
-
-                #Save scan modules to cache
-                if (CT_SCAN_CACHING):
-                    #Save the object ONLY if its not already cached
-                    if (CT_scan_object.name not in cached_scan_names):
-                        file = open(os.path.join(CT_SCAN_CACHING_PATH,CT_scan_object.name) + '.csm', 'wb')
-                        pickle.dump(CT_scan_object, file)
-                        print('**Scan "{}" saved to cache.'.format(CT_scan_object.name))
+                    #Save scan modules to cache
+                    if (CT_SCAN_CACHING):
+                        #Save the object ONLY if its not already cached
+                        if (scan_instance.name not in cached_scan_names):
+                            file = open(os.path.join(CT_SCAN_CACHING_PATH,scan_instance.name) + '.csm', 'wb')
+                            pickle.dump(scan_instance, file)
+                            print('**Scan "{}" saved to cache.'.format(scan_instance.name))
 
 
     #Loads DICOM data using MedPy
@@ -387,7 +407,7 @@ class NeuralNetManager:
             dicom_data, dicom_header = medpy.io.load(path_to_data)
         except:
             print("[!] Loading failed, file: {}".format(path_to_data))
-        return dicom_data
+        return (dicom_data, dicom_header)
 
 
     def resize_ct_scans(self, new_resolution):

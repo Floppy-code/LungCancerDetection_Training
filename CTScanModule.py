@@ -1,16 +1,19 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import SimpleITK as sitk
 import cv2 
+
 
 class CTScanModule:
     """CTScanModule holds all information related to a CT scan of one patient."""
 
-    def __init__(self, name, id, scan_array, nodule_location):
+    def __init__(self, name, id, scan_array, scan_header):
         self._name = name
         self._id = id
+        self._ct_scan_header = scan_header.sitkimage
         self._ct_scan_array = scan_array
         self._slice_count = self._ct_scan_array.shape[2]
-        self._nodule_location = [nodule_location] #List with touples of locations (x, y ,z)
+        self._nodule_location = [] #List with touples of locations (x, y ,z)
         self._nodule_count = len(self._nodule_location)
         self._is_normalized = False
         self._is_transposed = False
@@ -52,10 +55,30 @@ class CTScanModule:
     def is_transposed(self):
         return self._is_transposed
 
+    @property
+    def image_origin(self):
+        return np.array(self._ct_scan_header.GetOrigin())
 
-    def add_nodule_location(self, location):
-        self._nodule_count += 1
-        self._nodule_location.append(location)
+    @property
+    def image_spacing(self):
+        return np.array(self._ct_scan_header.GetSpacing())
+
+
+    def add_nodule_location(self, location, coordinates = 0):
+        #Coordinates: 0 - voxel coordinates
+        #             1 - world coordinates
+        if (coordinates == 0):
+            self._nodule_count += 1
+            if (location not in self.nodule_location):
+                self._nodule_location.append(location)
+        elif (coordinates == 1):
+            converted = self.convert_world_to_voxel_coords(location)
+            self._nodule_count += 1 
+            #[!] WARNING: This doesnt check if the node location isnt already in the list, may create duplicates!
+            print("Voxel (x,y,z): {}".format(converted.astype(int)))
+            self._nodule_location.append(converted.astype(int)) 
+        else:
+            raise Exception("Invalid coordinates!")
 
 
     #Modes:
@@ -73,7 +96,9 @@ class CTScanModule:
             plt.show()
         
         elif (mode == 'n'):
-            z_location = self._slice_count - self._nodule_location[slice_no][2] #Slice with nodule is SliceCount - NoduleLoc
+            z_location = self._nodule_location[slice_no][2] #Slice with nodule is SliceCount - NoduleLoc
+            #Img - (z, y, x)
+            #Nod - (x, y, z)
             x_location = self._nodule_location[slice_no][1]
             y_location = self._nodule_location[slice_no][0]
         
@@ -96,7 +121,7 @@ class CTScanModule:
             raise Exception("Invalid mode!")
 
 
-    #Transposes the np array to (z, x, y):
+    #Transposes the np array to (z, y, x):
     def transpose_ct_scan(self):
         print("**Transposing {}".format(self._name))
         
@@ -146,3 +171,7 @@ class CTScanModule:
             self.nodule_location[i] = (int(x), int(y), self._nodule_location[i][2])
         
         print('**Images in dataset "{}" resized!'.format(self._name))
+
+
+    def convert_world_to_voxel_coords(self, nodule_position):
+        return np.round((np.array(nodule_position) - self.image_origin) / self.image_spacing)
