@@ -1,6 +1,7 @@
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Activation, Dense, Dropout, Flatten, Concatenate
 from keras.callbacks import EarlyStopping
+from keras.optimizers import Adam
 
 NN_SHAPE = (256, 256, 1)
 
@@ -78,35 +79,28 @@ def get_neural_net_WH():
     #256px in
     model.add(Conv2D(8, (3,3), input_shape = NN_SHAPE, padding = 'same'))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size = (2,2)))
+    model.add(MaxPooling2D(pool_size = (4,4)))
+    model.add(Dropout(0.3))
 
     model.add(Conv2D(16, (3,3), padding = 'same'))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size = (2,2)))
+    model.add(MaxPooling2D(pool_size = (4,4)))
+    model.add(Dropout(0.3))
 
     model.add(Conv2D(32, (3,3), padding = 'same'))
     model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size = (2,2)))
-
-    model.add(Conv2D(64, (3,3), padding = 'same'))
-    model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size = (2,2)))
-
-    model.add(Conv2D(128, (3,3), padding = 'same'))
-    model.add(Activation('relu'))
+    model.add(Dropout(0.4))
 
     model.add(Flatten())
 
-    model.add(Dense(512))
+    model.add(Dense(128))
     model.add(Activation('relu'))
-
-    model.add(Dense(256))
-    model.add(Activation('relu'))
+    model.add(Dropout(0.8))
 
     model.add(Dense(1))
     model.add(Activation('sigmoid'))
 
-    model.compile(optimizer = 'Adam', loss = 'binary_crossentropy', metrics = ['accuracy'])
+    model.compile(optimizer = Adam(lr = 0.00005), loss = 'binary_crossentropy', metrics = ['accuracy'])
     model.summary()
     
     return model

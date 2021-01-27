@@ -25,7 +25,7 @@ RESIZE_ON_LOAD = True
 RESIZE_DEFAULT_VAL = 256
 
 #Saves training stats after every epoch into file
-TRAINING_HISTORY = False  
+TRAINING_HISTORY = True  
 TRAINING_HISTORY_VAL_ACC = 'val_acc_training.txt'
 TRAINING_HISTORY_ACC = 'acc_training.txt'
 TRAINING_HISTORY_VAL_LOSS = 'val_loss_training.txt'
@@ -41,7 +41,8 @@ UNDERSAMPLING = 1
 OVERSAMPLING = 2
 
 #CNN Model
-MODEL_SAVE_PATH = 'last_model.h5'
+SAVE_MODELS = True
+MODEL_SAVE_PATH = '.old_models'
 
 #Annotations file path
 ANOTATIONS_PATH = 'D:/LungCancerCTScans/LUNA16/annotations.csv'
@@ -53,11 +54,11 @@ class NeuralNetManager:
     def __init__(self):
         self._ct_scan_list = []
         self._last_used_scan = -1 #K-Fold validation
-        self._number_of_folds = 10
+        self._number_of_folds = 5
 
 
     def train_model(self):
-        model_name = 'LUNA16_Dataset_Experiment1' #Used for statistics
+        model_name = 'LUNA16_Experiment_3' #Used for statistics
         for current_fold in range(0, self._number_of_folds):
             #Data
             data = self.generate_fset(current_fold, OVERSAMPLING, ONE_HOT)
@@ -87,12 +88,15 @@ class NeuralNetManager:
             #model = NeuralNet.get_neural_net_VGG19()
             history = model.fit(feature_set_training, label_set_training,
                                 batch_size = 64,
-                                epochs = 16,
+                                epochs = 20,
                                 verbose = 1,
                                 validation_data = (feature_set_validation, label_set_validation),
                                 shuffle = True)
             
-            model.save(MODEL_SAVE_PATH) #TODO For every fold
+            if (SAVE_MODELS and MODEL_SAVE_PATH not in os.listdir('.')):
+                os.mkdir(MODEL_SAVE_PATH)
+            elif (SAVE_MODELS):
+                model.save(os.path.join(MODEL_SAVE_PATH, "{}_fold{}.h5".format(model_name, current_fold)))
 
             #Saving
             if (TRAINING_HISTORY):
@@ -253,16 +257,20 @@ class NeuralNetManager:
             print("**Rotating training feature set.")
             for train_img in training_fset:
                 print("\r**Rotating image: {}/{}".format(print_counter + 1, training_fset.shape[0]), end = '')
+                if (print_counter + 1 == training_fset.shape[0]):
+                    print("...DONE")
                 random_angle = random.randint(0, 360)
-                train_img = ndimage.rotate(train_img, random_angle)
+                train_img = ndimage.rotate(train_img, random_angle, order = 0)
                 print_counter += 1
 
             print_counter = 0
-            print("\n**Rotating validation feature set.")
+            print("**Rotating validation feature set.")
             for validate_img in validation_fset:
                 print("\r**Rotating image: {}/{}".format(print_counter + 1, validation_fset.shape[0]), end = '')
+                if (print_counter + 1 == validation_fset.shape[0]):
+                    print("...DONE")
                 random_angle = random.randint(0, 360)
-                validate_img = ndimage.rotate(validate_img, random_angle)
+                validate_img = ndimage.rotate(validate_img, random_angle, order = 0)
                 print_counter += 1
 
         #Reshaping for CNN
@@ -277,7 +285,7 @@ class NeuralNetManager:
 
     def save_training_statistics(self, file_path, data_to_save, model_name, model_fold):
         save_file = open(file_path, 'a+')
-        save_file.write(model_name + ' fold: {}'.format(model_fold))
+        save_file.write(model_name + ' fold_{}'.format(model_fold))
         for value in data_to_save:
             save_file.write(';{}'.format(value))
         save_file.write('\n')
