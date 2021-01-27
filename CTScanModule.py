@@ -142,7 +142,7 @@ class CTScanModule:
         self._is_normalized = True
 
 
-    def resize_image(self, resolution):
+    def resize_images(self, resolution):
         #Steps:
         #1. Calculate the scale for resizing
         #2. Resize the image

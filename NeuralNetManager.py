@@ -7,6 +7,9 @@ import numpy as np
 import os
 import pickle
 import random
+import math
+import gc
+from scipy import ndimage
 
 from keras.callbacks import EarlyStopping
 
@@ -83,7 +86,7 @@ class NeuralNetManager:
             model = NeuralNet.get_neural_net_WH()
             #model = NeuralNet.get_neural_net_VGG19()
             history = model.fit(feature_set_training, label_set_training,
-                                batch_size = 16,
+                                batch_size = 64,
                                 epochs = 16,
                                 verbose = 1,
                                 validation_data = (feature_set_validation, label_set_validation),
@@ -110,7 +113,7 @@ class NeuralNetManager:
         positive = 0
         #[!] WARNING: Random sampler for heatmaps not implemented yet!
         for i in range(0, len(label_set)):
-            if (label_set[i] == True):
+            if (label_set[i] == 1.0):
                 positive += 1
                 positive_indexes.append(i)
 
@@ -149,6 +152,7 @@ class NeuralNetManager:
             copies_lset = []
             while (positive != negative):
                 rand_index = random.randint(0, len(positive_indexes) - 1)
+
                 copies_fset.append(np.copy(feature_set[positive_indexes[rand_index]]))
                 copies_lset.append(np.copy(label_set[positive_indexes[rand_index]]))
 
@@ -196,7 +200,7 @@ class NeuralNetManager:
 
         print("**Generating validation Feature and Label set")
         #How many sets will be in a fold
-        dataset_count_to_use = int(len(self._ct_scan_list) / self._number_of_folds) 
+        dataset_count_to_use = math.ceil(len(self._ct_scan_list) / self._number_of_folds) 
         
         #Select indexes supposed to be in training and validation folds
         validation_scans = [x for x in range(fold_to_use * dataset_count_to_use, fold_to_use * dataset_count_to_use + dataset_count_to_use)]
@@ -220,8 +224,7 @@ class NeuralNetManager:
         print('')
 
 
-        #Data augumentation=========================================================
-        #[!] WARNING: Do not use! May not work anymore!!!! More testing needed.
+        #Data augumentation - Random sampling
         if (data_aug_options != 0):
             temp_training = None
             temp_validation = None
@@ -238,7 +241,29 @@ class NeuralNetManager:
 
             validation_fset = temp_validation[0]
             validation_lset = temp_validation[1]
-        #Data augumentation=========================================================
+
+            #[!] MANUAL Garbage Collection!
+            gc.collect()
+
+        #Data augumentation - Random image rotation
+        random_rotation = True
+        if (random_rotation):
+            #Iterates over all images in feature sets and rotates them by random degree
+            print_counter = 0
+            print("**Rotating training feature set.")
+            for train_img in training_fset:
+                print("\r**Rotating image: {}/{}".format(print_counter + 1, training_fset.shape[0]), end = '')
+                random_angle = random.randint(0, 360)
+                train_img = ndimage.rotate(train_img, random_angle)
+                print_counter += 1
+
+            print_counter = 0
+            print("\n**Rotating validation feature set.")
+            for validate_img in validation_fset:
+                print("\r**Rotating image: {}/{}".format(print_counter + 1, validation_fset.shape[0]), end = '')
+                random_angle = random.randint(0, 360)
+                validate_img = ndimage.rotate(validate_img, random_angle)
+                print_counter += 1
 
         #Reshaping for CNN
         print("**Reshaping validation sets")
@@ -276,11 +301,11 @@ class NeuralNetManager:
         if (lset_mode == ONE_HOT):
             ct_scan_module = self.search_scan_by_id(ct_scan_index)
             slice_count = ct_scan_module.slice_count
-            label_set = np.full(slice_count, False) #Fils label set with 0.0 values
+            label_set = np.full(slice_count, 0.0) #Fils label set with 0.0 values
         
             #Iterates over all nodule locations and adds 1.0 when z axis is positive
             for loc in ct_scan_module.nodule_location:
-                label_set[loc[2]] = True
+                label_set[loc[2]] = 1.0
 
             return label_set
         
@@ -365,6 +390,7 @@ class NeuralNetManager:
                     print('**Scan "{}" loaded from cache.'.format(loaded_scan.name))
                 else:
                     print('Scan "{}" already loaded!'.format(loaded_scan.name))
+                file.close()
 
         file = open(path_file, 'r') #Reading the .csv file
         for line in file.readlines():
@@ -386,7 +412,7 @@ class NeuralNetManager:
                     scan_instance.transpose_ct_scan()
                     self.load_nodes_single(ANOTATIONS_PATH, scan_instance)
                     if (RESIZE_ON_LOAD):
-                        scan_instance.resize_image(RESIZE_DEFAULT_VAL)
+                        scan_instance.resize_images(RESIZE_DEFAULT_VAL)
                     self._ct_scan_list.append(scan_instance)
 
                     #Save scan modules to cache
@@ -396,6 +422,7 @@ class NeuralNetManager:
                             file = open(os.path.join(CT_SCAN_CACHING_PATH,scan_instance.name) + '.csm', 'wb')
                             pickle.dump(scan_instance, file)
                             print('**Scan "{}" saved to cache.'.format(scan_instance.name))
+                            file.close()
 
 
     #Loads DICOM data using MedPy
@@ -413,5 +440,5 @@ class NeuralNetManager:
         counter = 1
         for ct_scan in self._ct_scan_list:
             print('**Resizing dataset {}, {}/{}'.format(ct_scan.name, counter, len(self._ct_scan_list)))
-            ct_scan.resize_image(new_resolution)
+            ct_scan.resize_images(new_resolution)
             counter += 1
