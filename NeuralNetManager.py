@@ -22,7 +22,7 @@ import NeuralNet
 CT_SCAN_CACHING = True  
 CT_SCAN_CACHING_PATH = '.scan_cache'
 RESIZE_ON_LOAD = True
-RESIZE_DEFAULT_VAL = 256
+RESIZE_DEFAULT_VAL = 224
 
 #Saves training stats after every epoch into file
 TRAINING_HISTORY = True  
@@ -58,7 +58,7 @@ class NeuralNetManager:
 
 
     def train_model(self):
-        model_name = 'LUNA16_Experiment_3' #Used for statistics
+        model_name = 'LUNA16_NonAugumentedDataset_VGG16' #Used for statistics
         for current_fold in range(0, self._number_of_folds):
             #Data
             data = self.generate_fset(current_fold, OVERSAMPLING, ONE_HOT)
@@ -84,17 +84,18 @@ class NeuralNetManager:
             #        print(label_set_training[i - 1])
 
             #Training
-            model = NeuralNet.get_neural_net_WH()
+            model = NeuralNet.get_neural_net_VGG16()
             #model = NeuralNet.get_neural_net_VGG19()
             history = model.fit(feature_set_training, label_set_training,
-                                batch_size = 64,
-                                epochs = 20,
+                                batch_size = 32,
+                                epochs = 15,
                                 verbose = 1,
                                 validation_data = (feature_set_validation, label_set_validation),
                                 shuffle = True)
             
             if (SAVE_MODELS and MODEL_SAVE_PATH not in os.listdir('.')):
                 os.mkdir(MODEL_SAVE_PATH)
+                model.save(os.path.join(MODEL_SAVE_PATH, "{}_fold{}.h5".format(model_name, current_fold)))
             elif (SAVE_MODELS):
                 model.save(os.path.join(MODEL_SAVE_PATH, "{}_fold{}.h5".format(model_name, current_fold)))
 
@@ -177,7 +178,7 @@ class NeuralNetManager:
 
             return (feature_set, label_set)
 
-        
+
     def generate_fset(self, fold_to_use, data_aug_options = NONE, label_set_mode = ONE_HOT):
         """Returns a touple with ((training_fset, training_lset), (validation_fset, validation_lset))"""
         #Feature set shape - (len(fset), 512, 512, 1)
@@ -313,7 +314,9 @@ class NeuralNetManager:
         
             #Iterates over all nodule locations and adds 1.0 when z axis is positive
             for loc in ct_scan_module.nodule_location:
+                label_set[loc[2] - 1] = 1.0
                 label_set[loc[2]] = 1.0
+                label_set[loc[2] + 1] = 1.0
 
             return label_set
         
